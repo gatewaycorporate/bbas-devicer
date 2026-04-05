@@ -66,9 +66,9 @@ import {
 // ── Initialise plugins ──────────────────────────────────────
 const deviceManager = new DeviceManager({ /* … */ });
 
-const ipManager   = new IpManager({ licenseKey: process.env.IP_LICENSE_KEY });
-const tlsManager  = new TlsManager({ licenseKey: process.env.TLS_LICENSE_KEY });
-const bbasManager = new BbasManager({ licenseKey: process.env.BBAS_LICENSE_KEY });
+const ipManager   = new IpManager({ licenseKey: process.env.DEVICER_LICENSE_KEY });
+const tlsManager  = new TlsManager({ licenseKey: process.env.DEVICER_LICENSE_KEY });
+const bbasManager = new BbasManager({ licenseKey: process.env.DEVICER_LICENSE_KEY });
 
 // Register ip-devicer and tls-devicer FIRST so their enrichmentInfo
 // is available when bbas-devicer runs (post-processor ordering matters).
@@ -109,7 +109,7 @@ app.post('/identify', async (req, res) => {
 import { createSqliteBbasStorage } from 'bbas-devicer';
 
 const bbasManager = new BbasManager({
-  licenseKey: process.env.BBAS_LICENSE_KEY,
+  licenseKey: process.env.DEVICER_LICENSE_KEY,
   storage: createSqliteBbasStorage('/data/bbas.db'),
 });
 ```
