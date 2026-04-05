@@ -1,9 +1,23 @@
+/** Neutral baseline human-likeness score used when no behavior is available. */
 const HUMAN_SCORE_DEFAULT = 50;
+/** Minimum allowed human-likeness score. */
 const HUMAN_SCORE_MIN = 0;
+/** Maximum allowed human-likeness score. */
 const HUMAN_SCORE_MAX = 100;
 function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
 }
+/**
+ * Analyze optional behavioral metrics and derive a human-likeness summary.
+ *
+ * The score starts from a neutral baseline and is adjusted using session timing,
+ * pointer movement, and keyboard-rhythm heuristics. Advanced mouse/keyboard
+ * signals are only applied when `enableAdvancedSignals` is enabled.
+ *
+ * @param metrics - Collected behavioral telemetry for the request, if available.
+ * @param enableAdvancedSignals - Whether to apply mouse and keyboard heuristics.
+ * @returns Behavioral summary including the final `humanScore` and triggered factors.
+ */
 export function analyzeBehavior(metrics, enableAdvancedSignals) {
     if (!metrics) {
         return {

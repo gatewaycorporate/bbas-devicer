@@ -20,6 +20,7 @@ interface BotPattern {
   isCrawler: boolean;
 }
 
+/** Known browser UA substrings that indicate a normal interactive browser runtime. */
 const MOST_LEGITIMATE_PATTERNS: BotPattern[] = [
 	// ── Legitimate browsers (flagged, not blocked by default) ───────
 	{ pattern: /Mozilla\/5\.0/i, 		botKind: 'browser', isHeadless: false, 	isCrawler: false },
@@ -30,6 +31,7 @@ const MOST_LEGITIMATE_PATTERNS: BotPattern[] = [
 	{ pattern: /Edge/i, 						botKind: 'browser', isHeadless: false, 	isCrawler: false },
 ];
 
+/** Known headless, crawler, and scraper UA patterns used for early classification. */
 const KNOWN_BOT_PATTERNS: BotPattern[] = [
   // ── Headless browsers ────────────────────────────────────────
   { pattern: /HeadlessChrome/i,   botKind: 'headless', isHeadless: true,  isCrawler: false },

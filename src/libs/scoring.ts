@@ -49,6 +49,7 @@ const FACTOR_POINTS: Record<string, number> = {
   uniform_typing_rhythm:     15,
 };
 
+/** Factor keys that are only applied when advanced behavioral analysis is enabled. */
 const ADVANCED_BEHAVIORAL_FACTORS = new Set([
   'no_mouse_movement',
   'robotic_mouse_pattern',

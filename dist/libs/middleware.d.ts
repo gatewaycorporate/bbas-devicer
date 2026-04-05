@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { BbasIdentifyContext, BotDecision } from '../types.js';
 import type { BbasManager } from '../core/BbasManager.js';
+/** Express/Connect-style continuation callback used by the BBAS middleware. */
 export type NextFunction = (err?: unknown) => void;
 /** Extended request with BBAS context attached by the middleware. */
 export interface BbasRequest extends IncomingMessage {

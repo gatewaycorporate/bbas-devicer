@@ -99,6 +99,27 @@ export class BbasManager {
     };
     initPromise = null;
     opts;
+    /**
+     * Create a BBAS manager with optional scoring, rule, storage, and license configuration.
+     *
+     * When a license key is supplied the constructor optimistically uses the paid-tier
+     * history depth until {@link init} validates the key. If validation fails, the
+     * instance falls back to the free-tier limits.
+     *
+     * @param options - Optional runtime configuration.
+     * @param options.licenseKey - Polar license key used to unlock paid tiers.
+     * @param options.storage - Custom BBAS storage backend. Defaults to the in-memory adapter.
+     * @param options.challengeThreshold - Bot score at or above which the default rules challenge. Defaults to the package default.
+     * @param options.blockThreshold - Bot score at or above which the default rules block. Defaults to the package default.
+     * @param options.velocityWindowMs - Sliding window used for per-device request-rate analysis.
+     * @param options.maxRequestsPerWindow - Threshold above which the velocity factor fires.
+     * @param options.enableVelocity - Whether velocity signals are included in scoring.
+     * @param options.enableUaAnalysis - Whether User-Agent analysis is included in scoring.
+     * @param options.enableBehavioralAnalysis - Whether advanced behavioral heuristics are included in scoring.
+     * @param options.enableCrossPlugin - Whether ip/tls/peer enrichment signals are included in scoring.
+     * @param options.rules - Custom rule overrides or additions merged with the defaults.
+     * @param options.maxHistoryPerDevice - Maximum BBAS snapshots retained per device.
+     */
     constructor(options = {}) {
         const hasKey = Boolean(options.licenseKey?.trim());
         if (!hasKey) {
