@@ -1,10 +1,12 @@
-import type { BbasEnrichment, BbasRule, BbasSnapshot, BotDecision, CrossPluginSignals, HeaderAnomalySignals, UaClassification, VelocitySignals } from '../types.js';
+import type { BbasEnrichment, BbasRule, BbasSnapshot, BehavioralSignals, BotDecision, CrossPluginSignals, HeaderAnomalySignals, UaClassification, VelocitySignals } from '../types.js';
 /** All signal inputs needed to compute a bot score. */
 export interface BotScoringInput {
     ua: UaClassification;
     headers: HeaderAnomalySignals;
     velocity: VelocitySignals;
+    behavioral?: BehavioralSignals;
     crossPlugin?: CrossPluginSignals;
+    enableBehavioralAnalysis: boolean;
     /** When `false`, cross-plugin signals are ignored even if present. */
     enableCrossPlugin: boolean;
 }

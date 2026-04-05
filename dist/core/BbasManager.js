@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { createBbasStorage } from '../libs/adapters/inmemory.js';
 import { analyzeUserAgent } from '../libs/analyzers/ua.js';
 import { analyzeHeaders } from '../libs/analyzers/headers.js';
+import { analyzeBehavior } from '../libs/analyzers/behavioral.js';
 import { computeVelocitySignals } from '../libs/velocity.js';
 import { computeBotScore, computeConsistencyScore, applyRules } from '../libs/scoring.js';
 import { DEFAULT_RULES, mergeRules } from '../libs/rules.js';
@@ -114,6 +115,7 @@ export class BbasManager {
             maxRequestsPerWindow: options.maxRequestsPerWindow ?? 120,
             enableVelocity: options.enableVelocity ?? true,
             enableUaAnalysis: options.enableUaAnalysis ?? true,
+            enableBehavioralAnalysis: options.enableBehavioralAnalysis ?? true,
             enableCrossPlugin: options.enableCrossPlugin ?? true,
             rules: mergeRules(options.rules ?? [], DEFAULT_RULES),
             maxHistoryPerDevice: maxHistory,
@@ -175,7 +177,7 @@ export class BbasManager {
      * @param crossPlugin - Pre-extracted cross-plugin signals (optional; populated
      *                      automatically in the post-processor path).
      */
-    async analyze(deviceId, context, crossPlugin) {
+    async analyze(deviceId, context, crossPlugin, behavioralMetrics) {
         await this.ensureInit();
         const headers = context.headers ?? {};
         // ── Free-tier device cap ──────────────────────────────────
@@ -212,12 +214,15 @@ export class BbasManager {
         // ── Cross-plugin gate (Pro/Enterprise) ────────────────────
         const isPaid = this.licenseInfo.tier !== 'free';
         const effectiveCrossPlugin = this.opts.enableCrossPlugin && isPaid ? crossPlugin : undefined;
+        const behavioralSignals = analyzeBehavior(behavioralMetrics, this.opts.enableBehavioralAnalysis && isPaid);
         // ── Bot score ─────────────────────────────────────────────
         const { score: botScore, factors: botFactors } = computeBotScore({
             ua,
             headers: headerAnomalies,
             velocity: velocitySignals,
+            behavioral: behavioralSignals,
             crossPlugin: effectiveCrossPlugin,
+            enableBehavioralAnalysis: this.opts.enableBehavioralAnalysis && isPaid,
             enableCrossPlugin: this.opts.enableCrossPlugin && isPaid,
         });
         // ── Consistency ───────────────────────────────────────────
@@ -229,6 +234,7 @@ export class BbasManager {
             uaClassification: ua,
             headerAnomalies,
             velocitySignals,
+            behavioralSignals,
             crossPluginSignals: effectiveCrossPlugin,
         };
         const consistencyScore = computeConsistencyScore({ ...partialEnrichment, decision: 'allow', consistencyScore: 0 }, history);
@@ -268,12 +274,13 @@ export class BbasManager {
      * available in `result.enrichmentInfo.details` when bbas-devicer runs.
      */
     registerWith(deviceManager) {
-        return deviceManager.registerIdentifyPostProcessor?.(PLUGIN_NAME, async ({ result, context }) => {
+        return deviceManager.registerIdentifyPostProcessor?.(PLUGIN_NAME, async ({ incoming, result, context }) => {
             const ctx = (context ?? {});
+            const behavioralMetrics = incoming.behavioralMetrics;
             // Pull cross-plugin signals from sibling plugin enrichment details
             const details = result.enrichmentInfo?.details ?? {};
             const crossPlugin = extractCrossPluginSignals(details);
-            const { enrichment, decision } = await this.analyze(result.deviceId, ctx, crossPlugin);
+            const { enrichment, decision } = await this.analyze(result.deviceId, ctx, crossPlugin, behavioralMetrics);
             return {
                 result: {
                     bbasEnrichment: enrichment,
@@ -288,11 +295,13 @@ export class BbasManager {
                     isBot: enrichment.uaClassification.isBot,
                     isCrawler: enrichment.uaClassification.isCrawler,
                     velocity: enrichment.velocitySignals.requestsPerMinute,
+                    behavioralHumanScore: enrichment.behavioralSignals?.humanScore,
                 },
                 logMeta: {
                     botScore: enrichment.botScore,
                     decision,
                     factors: enrichment.botFactors,
+                    behavioralHumanScore: enrichment.behavioralSignals?.humanScore,
                 },
             };
         });

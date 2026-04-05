@@ -6,6 +6,7 @@ import type {
   BbasEnrichment,
   BbasRule,
   BbasSnapshot,
+  BehavioralSignals,
   BotDecision,
   CrossPluginSignals,
   HeaderAnomalySignals,
@@ -23,10 +24,16 @@ const FACTOR_POINTS: Record<string, number> = {
   // ── Free-tier signals ──────────────────────────────────────
   headless_browser:          45,
   known_scraper_ua:          40,
+  unknown_ua:                10,
   missing_browser_headers:   30,
   velocity_exceeded:         25,
   suspicious_header_order:   15,
+  no_prior_interaction:      10,
+  impossibly_fast_session:   15,
   known_crawler:              5,
+  legit_browser_ua:         -10,
+  natural_typing:            -5,
+  natural_mouse_movement:   -10,
   // ── Cross-plugin signals (Pro/Enterprise) ────────────────
   tor_exit_node:             40,
   tls_mismatch:              25,
@@ -35,7 +42,21 @@ const FACTOR_POINTS: Record<string, number> = {
   ai_agent:                  15,
   high_peer_taint:           15,
   rdap_suspect:              10,
+  // ── Advanced behavioral signals (Pro/Enterprise) ────────
+  no_mouse_movement:         20,
+  robotic_mouse_pattern:     25,
+  instant_typing:            20,
+  uniform_typing_rhythm:     15,
 };
+
+const ADVANCED_BEHAVIORAL_FACTORS = new Set([
+  'no_mouse_movement',
+  'robotic_mouse_pattern',
+  'instant_typing',
+  'uniform_typing_rhythm',
+  'natural_mouse_movement',
+  'natural_typing',
+]);
 
 // ── Thresholds ─────────────────────────────────────────────────
 
@@ -56,7 +77,9 @@ export interface BotScoringInput {
   ua: UaClassification;
   headers: HeaderAnomalySignals;
   velocity: VelocitySignals;
+  behavioral?: BehavioralSignals;
   crossPlugin?: CrossPluginSignals;
+  enableBehavioralAnalysis: boolean;
   /** When `false`, cross-plugin signals are ignored even if present. */
   enableCrossPlugin: boolean;
 }
@@ -69,7 +92,15 @@ export interface BotScoringInput {
  * @returns `{ score, factors }` — `factors` lists every fired factor key.
  */
 export function computeBotScore(input: BotScoringInput): { score: number; factors: string[] } {
-  const { ua, headers, velocity, crossPlugin, enableCrossPlugin } = input;
+  const {
+    ua,
+    headers,
+    velocity,
+    behavioral,
+    crossPlugin,
+    enableBehavioralAnalysis,
+    enableCrossPlugin,
+  } = input;
   const factors: string[] = [];
   let raw = 0;
 
@@ -85,6 +116,10 @@ export function computeBotScore(input: BotScoringInput): { score: number; factor
     add('known_scraper_ua');
   } else if (ua.isCrawler) {
     add('known_crawler');
+  } else if (ua.claimsLegitBrowser) {
+    add('legit_browser_ua');
+  } else {
+    add('unknown_ua');
   }
 
   // ── Header signals ────────────────────────────────────────────
@@ -98,6 +133,15 @@ export function computeBotScore(input: BotScoringInput): { score: number; factor
   // ── Velocity signals ──────────────────────────────────────────
   if (velocity.exceedsThreshold) {
     add('velocity_exceeded');
+  }
+
+  // ── Behavioral signals ─────────────────────────────────────
+  if (behavioral) {
+    for (const factor of behavioral.factors) {
+      if (!ADVANCED_BEHAVIORAL_FACTORS.has(factor) || enableBehavioralAnalysis) {
+        add(factor);
+      }
+    }
   }
 
   // ── Cross-plugin signals (Pro/Enterprise) ────────────────────
@@ -129,7 +173,7 @@ export function computeBotScore(input: BotScoringInput): { score: number; factor
     }
   }
 
-  return { score: Math.min(100, raw), factors };
+  return { score: Math.max(0, Math.min(100, raw)), factors };
 }
 
 /**

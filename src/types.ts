@@ -25,6 +25,8 @@ export interface UaClassification {
   isHeadless: boolean;
   /** `true` for known search/social crawlers — usually **not** blocked but flagged. */
   isCrawler: boolean;
+  /** `true` when the UA string looks like a legitimate mainstream browser. */
+  claimsLegitBrowser?: boolean;
   /**
    * Category label when identified.  Examples: `'headless'`, `'scraper'`,
    * `'crawler'`, `'http-client'`.
@@ -95,6 +97,65 @@ export interface CrossPluginSignals {
   rdapAsnOrg?: string;
 }
 
+/** Client-side aggregated mouse metrics supplied by fp-snatch. */
+export interface MouseBehaviorMetrics {
+  sampleCount: number;
+  avgVelocityPxMs: number;
+  velocityStdDev: number;
+  straightnessRatio: number;
+  avgAcceleration: number;
+  hasMovement: boolean;
+}
+
+/** Client-side aggregated keyboard timing metrics supplied by fp-snatch. */
+export interface KeyboardBehaviorMetrics {
+  keystrokeCount: number;
+  avgDwellMs: number;
+  dwellStdDev: number;
+  avgFlightMs: number;
+  flightStdDev: number;
+  estimatedWpm: number;
+}
+
+/** Client-side aggregated scroll metrics supplied by fp-snatch. */
+export interface ScrollBehaviorMetrics {
+  eventCount: number;
+  avgVelocityPxMs: number;
+  velocityStdDev: number;
+  directionChangeCount: number;
+  totalDistancePx: number;
+}
+
+/** Session-level interaction timing metrics supplied by fp-snatch. */
+export interface SessionTimingMetrics {
+  sessionDurationMs: number;
+  timeToFirstInteractionMs: number | null;
+  interactionEventCount: number;
+  touchEventCount: number;
+}
+
+/** Full behavioral biometrics payload supplied by fp-snatch. */
+export interface BehavioralMetrics {
+  mouse?: MouseBehaviorMetrics;
+  keyboard?: KeyboardBehaviorMetrics;
+  scroll?: ScrollBehaviorMetrics;
+  session: SessionTimingMetrics;
+  collectionDurationMs: number;
+  hasTouchEvents: boolean;
+}
+
+/** Aggregated behavioral biometrics signals derived from client-side metrics. */
+export interface BehavioralSignals {
+  /** `true` when client-side behavioral metrics were provided. */
+  hasData: boolean;
+  /** `true` when the aggregate behavioral profile looks robotic. */
+  isRobotic: boolean;
+  /** Factor strings describing the detected behavioral patterns. */
+  factors: string[];
+  /** Human-likeness score (0–100). Higher means more natural behavior. */
+  humanScore: number;
+}
+
 // ── Aggregated enrichment ──────────────────────────────────────
 
 /** Full enrichment payload added to `IdentifyResult` by bbas-devicer. */
@@ -114,6 +175,8 @@ export interface BbasEnrichment {
   headerAnomalies: HeaderAnomalySignals;
   /** Request velocity for this device. */
   velocitySignals: VelocitySignals;
+  /** Behavioral biometrics summary when client-side metrics are available. */
+  behavioralSignals?: BehavioralSignals;
   /** Cross-plugin signals when `enableCrossPlugin` is active. */
   crossPluginSignals?: CrossPluginSignals;
   /**
@@ -238,6 +301,12 @@ export interface BbasManagerOptions {
    */
   enableUaAnalysis?: boolean;
   /**
+   * Enable advanced behavioral biometrics analysis (mouse/typing dynamics).
+   * Session-level behavioral heuristics still run when metrics are present.
+   * Advanced analysis requires Pro or Enterprise. Default: `true`.
+   */
+  enableBehavioralAnalysis?: boolean;
+  /**
    * Enable cross-plugin signal enrichment from ip-devicer, tls-devicer, and
    * peer-devicer. Requires Pro or Enterprise license. Default: `true`.
    */
@@ -270,6 +339,11 @@ export interface BbasIdentifyContext {
   userId?: string;
   /** Incoming request headers (lower-cased). */
   headers?: Record<string, string | string[] | undefined>;
+}
+
+/** Incoming fingerprint payload subset needed by bbas-devicer. */
+export interface BehavioralFingerprintPayload {
+  behavioralMetrics?: BehavioralMetrics;
 }
 
 // ── Extended IdentifyResult ────────────────────────────────────

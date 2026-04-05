@@ -1,6 +1,7 @@
 import { type LicenseTier } from '../libs/license.js';
 import type { BbasEnrichment, BbasIdentifyContext, BbasManagerOptions, BbasSnapshot, BotDecision, CrossPluginSignals } from '../types.js';
 import type { DeviceManagerPlugin, DeviceManagerLike } from 'devicer.js';
+import type { BehavioralMetrics } from '../types.js';
 /**
  * BbasManager — bot blocking and anti-scrape plugin for the FP-Devicer Suite.
  *
@@ -56,7 +57,7 @@ export declare class BbasManager implements DeviceManagerPlugin {
      * @param crossPlugin - Pre-extracted cross-plugin signals (optional; populated
      *                      automatically in the post-processor path).
      */
-    analyze(deviceId: string, context: BbasIdentifyContext, crossPlugin?: CrossPluginSignals): Promise<{
+    analyze(deviceId: string, context: BbasIdentifyContext, crossPlugin?: CrossPluginSignals, behavioralMetrics?: BehavioralMetrics): Promise<{
         enrichment: BbasEnrichment;
         decision: BotDecision;
     }>;

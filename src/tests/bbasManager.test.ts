@@ -6,6 +6,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { BbasManager } from '../core/BbasManager.js';
 import { evictLicenseCache, POLAR_BENEFIT_IDS } from '../libs/license.js';
 import type { IdentifyPostProcessor, IdentifyResult } from 'devicer.js';
+import type { BehavioralFingerprintPayload } from '../types.js';
 
 // ── Shared fixtures ───────────────────────────────────────────
 
@@ -103,6 +104,74 @@ describe('BbasManager post-processor — enrichment', () => {
     expect(r.result['bbasEnrichment']).toBeDefined();
     expect(r.result['bbasDecision']).toMatch(/^(allow|challenge|block)$/);
     expect(typeof r.enrichmentInfo['botScore']).toBe('number');
+  });
+
+  it('extracts behavioral metrics from the incoming fingerprint payload', async () => {
+    const mgr = new BbasManager();
+    const dm  = makeDM();
+    mgr.registerWith(dm);
+
+    const incoming: BehavioralFingerprintPayload = {
+      behavioralMetrics: {
+        mouse: {
+          sampleCount: 40,
+          avgVelocityPxMs: 0.5,
+          velocityStdDev: 3,
+          straightnessRatio: 0.98,
+          avgAcceleration: 0.01,
+          hasMovement: true,
+        },
+        keyboard: {
+          keystrokeCount: 10,
+          avgDwellMs: 5,
+          dwellStdDev: 2,
+          avgFlightMs: 4,
+          flightStdDev: 1,
+          estimatedWpm: 140,
+        },
+        scroll: {
+          eventCount: 0,
+          avgVelocityPxMs: 0,
+          velocityStdDev: 0,
+          directionChangeCount: 0,
+          totalDistancePx: 0,
+        },
+        session: {
+          sessionDurationMs: 800,
+          timeToFirstInteractionMs: 50,
+          interactionEventCount: 3,
+          touchEventCount: 0,
+        },
+        collectionDurationMs: 800,
+        hasTouchEvents: false,
+      },
+    };
+
+    const out = await dm._runProcessor('bbas', {
+      incoming: incoming as Parameters<IdentifyPostProcessor>[0]['incoming'],
+      context: {
+        headers: {
+          'user-agent': 'Mozilla/5.0',
+          accept: 'text/html',
+          'accept-language': 'en-US',
+          'accept-encoding': 'gzip',
+        },
+      },
+      result: {
+        deviceId: 'dev-behavioral',
+        confidence: 70,
+        isNewDevice: false,
+        matchConfidence: 70,
+        enrichmentInfo: { plugins: [], details: {}, failures: [] },
+      },
+      baseResult: BASE_RESULT,
+      cacheHit: false,
+      candidatesCount: 1,
+      matched: true,
+      durationMs: 10,
+    }) as { result: { bbasEnrichment: { behavioralSignals: { factors: string[] } } } };
+
+    expect(out.result.bbasEnrichment.behavioralSignals.factors).toContain('impossibly_fast_session');
   });
 
   it('returns undefined when context has no usable signals', async () => {

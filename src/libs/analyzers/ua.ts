@@ -20,6 +20,16 @@ interface BotPattern {
   isCrawler: boolean;
 }
 
+const MOST_LEGITIMATE_PATTERNS: BotPattern[] = [
+	// ── Legitimate browsers (flagged, not blocked by default) ───────
+	{ pattern: /Mozilla\/5\.0/i, 		botKind: 'browser', isHeadless: false, 	isCrawler: false },
+	{ pattern: /AppleWebKit/i, 			botKind: 'browser', isHeadless: false, 	isCrawler: false },
+	{ pattern: /Safari/i, 					botKind: 'browser', isHeadless: false, 	isCrawler: false },
+	{ pattern: /Chrome/i, 					botKind: 'browser', isHeadless: false, 	isCrawler: false },
+	{ pattern: /Firefox/i, 					botKind: 'browser', isHeadless: false, 	isCrawler: false },
+	{ pattern: /Edge/i, 						botKind: 'browser', isHeadless: false, 	isCrawler: false },
+];
+
 const KNOWN_BOT_PATTERNS: BotPattern[] = [
   // ── Headless browsers ────────────────────────────────────────
   { pattern: /HeadlessChrome/i,   botKind: 'headless', isHeadless: true,  isCrawler: false },
@@ -57,7 +67,7 @@ const KNOWN_BOT_PATTERNS: BotPattern[] = [
   { pattern: /^axios\//i,         botKind: 'http-client', isHeadless: false, isCrawler: false },
   { pattern: /^node-fetch\//i,    botKind: 'http-client', isHeadless: false, isCrawler: false },
   { pattern: /^node-http\//i,     botKind: 'http-client', isHeadless: false, isCrawler: false },
-  { pattern: /Go-http-client/i,    botKind: 'http-client', isHeadless: false, isCrawler: false },
+  { pattern: /Go-http-client/i,   botKind: 'http-client', isHeadless: false, isCrawler: false },
   { pattern: /^Java\//i,          botKind: 'http-client', isHeadless: false, isCrawler: false },
   { pattern: /libwww-perl/i,      botKind: 'http-client', isHeadless: false, isCrawler: false },
   { pattern: /HTTPie\//i,         botKind: 'http-client', isHeadless: false, isCrawler: false },
@@ -89,6 +99,7 @@ export function analyzeUserAgent(ua: string | undefined): UaClassification {
       isBot: false,
       isHeadless: false,
       isCrawler: false,
+      claimsLegitBrowser: false,
       uaString,
     };
   }
@@ -99,11 +110,31 @@ export function analyzeUserAgent(ua: string | undefined): UaClassification {
         isBot: !entry.isCrawler,
         isHeadless: entry.isHeadless,
         isCrawler: entry.isCrawler,
+        claimsLegitBrowser: false,
         botKind: entry.botKind,
         uaString,
       };
     }
   }
 
-  return { isBot: false, isHeadless: false, isCrawler: false, uaString };
+  for (const entry of MOST_LEGITIMATE_PATTERNS) {
+    if (entry.pattern.test(uaString)) {
+      return {
+        isBot: false,
+        isHeadless: false,
+        isCrawler: false,
+        claimsLegitBrowser: true,
+        botKind: entry.botKind,
+        uaString,
+      };
+    }
+  }
+
+  return {
+    isBot: false,
+    isHeadless: false,
+    isCrawler: false,
+    claimsLegitBrowser: false,
+    uaString,
+  };
 }

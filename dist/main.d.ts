@@ -1,9 +1,10 @@
 export { BbasManager } from './core/BbasManager.js';
 export { validateLicense, evictLicenseCache, POLAR_ORGANIZATION_ID, POLAR_BENEFIT_IDS, FREE_TIER_MAX_DEVICES, FREE_TIER_MAX_HISTORY, } from './libs/license.js';
 export type { LicenseTier, LicenseInfo } from './libs/license.js';
-export type { BotDecision, UaClassification, HeaderAnomalySignals, VelocitySignals, CrossPluginSignals, BbasEnrichment, BbasSnapshot, BbasStorage, AsyncBbasStorage, BbasRule, BbasManagerOptions, BbasIdentifyContext, IdentifyResult, EnrichedIdentifyResult, } from './types.js';
+export type { BotDecision, UaClassification, HeaderAnomalySignals, VelocitySignals, CrossPluginSignals, MouseBehaviorMetrics, KeyboardBehaviorMetrics, ScrollBehaviorMetrics, SessionTimingMetrics, BehavioralMetrics, BehavioralSignals, BbasEnrichment, BbasSnapshot, BbasStorage, AsyncBbasStorage, BbasRule, BbasManagerOptions, BbasIdentifyContext, BehavioralFingerprintPayload, IdentifyResult, EnrichedIdentifyResult, } from './types.js';
 export { analyzeUserAgent } from './libs/analyzers/ua.js';
 export { analyzeHeaders } from './libs/analyzers/headers.js';
+export { analyzeBehavior } from './libs/analyzers/behavioral.js';
 export { computeVelocitySignals } from './libs/velocity.js';
 export { computeBotScore, applyRules, computeConsistencyScore, } from './libs/scoring.js';
 export type { BotScoringInput } from './libs/scoring.js';

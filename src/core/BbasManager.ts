@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { createBbasStorage } from '../libs/adapters/inmemory.js';
 import { analyzeUserAgent } from '../libs/analyzers/ua.js';
 import { analyzeHeaders } from '../libs/analyzers/headers.js';
+import { analyzeBehavior } from '../libs/analyzers/behavioral.js';
 import { computeVelocitySignals } from '../libs/velocity.js';
 import { computeBotScore, computeConsistencyScore, applyRules } from '../libs/scoring.js';
 import { DEFAULT_RULES, mergeRules } from '../libs/rules.js';
@@ -28,7 +29,14 @@ import type {
   CrossPluginSignals,
   VelocitySignals,
 } from '../types.js';
-import type { DeviceManagerPlugin, DeviceManagerLike } from 'devicer.js';
+import type {
+  DeviceManagerPlugin,
+  DeviceManagerLike,
+} from 'devicer.js';
+import type {
+  BehavioralFingerprintPayload,
+  BehavioralMetrics,
+} from '../types.js';
 
 // ── Plugin name registered with DeviceManager ─────────────────
 const PLUGIN_NAME = 'bbas';
@@ -140,6 +148,7 @@ export class BbasManager implements DeviceManagerPlugin {
     maxRequestsPerWindow: number;
     enableVelocity: boolean;
     enableUaAnalysis: boolean;
+    enableBehavioralAnalysis: boolean;
     enableCrossPlugin: boolean;
     rules: BbasRule[];
     maxHistoryPerDevice: number;
@@ -164,6 +173,7 @@ export class BbasManager implements DeviceManagerPlugin {
       maxRequestsPerWindow:  options.maxRequestsPerWindow  ?? 120,
       enableVelocity:        options.enableVelocity        ?? true,
       enableUaAnalysis:      options.enableUaAnalysis      ?? true,
+      enableBehavioralAnalysis: options.enableBehavioralAnalysis ?? true,
       enableCrossPlugin:     options.enableCrossPlugin     ?? true,
       rules:                 mergeRules(options.rules ?? [], DEFAULT_RULES),
       maxHistoryPerDevice:   maxHistory,
@@ -240,6 +250,7 @@ export class BbasManager implements DeviceManagerPlugin {
     deviceId: string,
     context: BbasIdentifyContext,
     crossPlugin?: CrossPluginSignals,
+    behavioralMetrics?: BehavioralMetrics,
   ): Promise<{ enrichment: BbasEnrichment; decision: BotDecision }> {
     await this.ensureInit();
 
@@ -289,13 +300,19 @@ export class BbasManager implements DeviceManagerPlugin {
     const isPaid = this.licenseInfo.tier !== 'free';
     const effectiveCrossPlugin =
       this.opts.enableCrossPlugin && isPaid ? crossPlugin : undefined;
+    const behavioralSignals = analyzeBehavior(
+      behavioralMetrics,
+      this.opts.enableBehavioralAnalysis && isPaid,
+    );
 
     // ── Bot score ─────────────────────────────────────────────
     const { score: botScore, factors: botFactors } = computeBotScore({
       ua,
       headers: headerAnomalies,
       velocity: velocitySignals,
+      behavioral: behavioralSignals,
       crossPlugin: effectiveCrossPlugin,
+      enableBehavioralAnalysis: this.opts.enableBehavioralAnalysis && isPaid,
       enableCrossPlugin: this.opts.enableCrossPlugin && isPaid,
     });
 
@@ -309,6 +326,7 @@ export class BbasManager implements DeviceManagerPlugin {
       uaClassification:  ua,
       headerAnomalies,
       velocitySignals,
+      behavioralSignals,
       crossPluginSignals: effectiveCrossPlugin,
     };
 
@@ -365,8 +383,9 @@ export class BbasManager implements DeviceManagerPlugin {
   registerWith(deviceManager: DeviceManagerLike): (() => void) | void {
     return deviceManager.registerIdentifyPostProcessor?.(
       PLUGIN_NAME,
-      async ({ result, context }) => {
+      async ({ incoming, result, context }) => {
         const ctx = (context ?? {}) as BbasIdentifyContext;
+        const behavioralMetrics = (incoming as BehavioralFingerprintPayload).behavioralMetrics;
 
         // Pull cross-plugin signals from sibling plugin enrichment details
         const details = result.enrichmentInfo?.details ?? {};
@@ -378,6 +397,7 @@ export class BbasManager implements DeviceManagerPlugin {
           result.deviceId,
           ctx,
           crossPlugin,
+          behavioralMetrics,
         );
 
         return {
@@ -394,11 +414,13 @@ export class BbasManager implements DeviceManagerPlugin {
             isBot:        enrichment.uaClassification.isBot,
             isCrawler:    enrichment.uaClassification.isCrawler,
             velocity:     enrichment.velocitySignals.requestsPerMinute,
+            behavioralHumanScore: enrichment.behavioralSignals?.humanScore,
           },
           logMeta: {
             botScore: enrichment.botScore,
             decision,
             factors:  enrichment.botFactors,
+            behavioralHumanScore: enrichment.behavioralSignals?.humanScore,
           },
         };
       },

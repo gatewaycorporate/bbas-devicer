@@ -10,10 +10,16 @@ const FACTOR_POINTS = {
     // ── Free-tier signals ──────────────────────────────────────
     headless_browser: 45,
     known_scraper_ua: 40,
+    unknown_ua: 10,
     missing_browser_headers: 30,
     velocity_exceeded: 25,
     suspicious_header_order: 15,
+    no_prior_interaction: 10,
+    impossibly_fast_session: 15,
     known_crawler: 5,
+    legit_browser_ua: -10,
+    natural_typing: -5,
+    natural_mouse_movement: -10,
     // ── Cross-plugin signals (Pro/Enterprise) ────────────────
     tor_exit_node: 40,
     tls_mismatch: 25,
@@ -22,7 +28,20 @@ const FACTOR_POINTS = {
     ai_agent: 15,
     high_peer_taint: 15,
     rdap_suspect: 10,
+    // ── Advanced behavioral signals (Pro/Enterprise) ────────
+    no_mouse_movement: 20,
+    robotic_mouse_pattern: 25,
+    instant_typing: 20,
+    uniform_typing_rhythm: 15,
 };
+const ADVANCED_BEHAVIORAL_FACTORS = new Set([
+    'no_mouse_movement',
+    'robotic_mouse_pattern',
+    'instant_typing',
+    'uniform_typing_rhythm',
+    'natural_mouse_movement',
+    'natural_typing',
+]);
 // ── Thresholds ─────────────────────────────────────────────────
 /** Peer taint score at which `high_peer_taint` fires. */
 const PEER_TAINT_THRESHOLD = 60;
@@ -37,7 +56,7 @@ const SUSPECT_ORG_PATTERN = /vpn|proxy|datacenter|hosting|anonymous|bulletproof|
  * @returns `{ score, factors }` — `factors` lists every fired factor key.
  */
 export function computeBotScore(input) {
-    const { ua, headers, velocity, crossPlugin, enableCrossPlugin } = input;
+    const { ua, headers, velocity, behavioral, crossPlugin, enableBehavioralAnalysis, enableCrossPlugin, } = input;
     const factors = [];
     let raw = 0;
     function add(factor) {
@@ -54,6 +73,12 @@ export function computeBotScore(input) {
     else if (ua.isCrawler) {
         add('known_crawler');
     }
+    else if (ua.claimsLegitBrowser) {
+        add('legit_browser_ua');
+    }
+    else {
+        add('unknown_ua');
+    }
     // ── Header signals ────────────────────────────────────────────
     if (headers.missingBrowserHeaders) {
         add('missing_browser_headers');
@@ -64,6 +89,14 @@ export function computeBotScore(input) {
     // ── Velocity signals ──────────────────────────────────────────
     if (velocity.exceedsThreshold) {
         add('velocity_exceeded');
+    }
+    // ── Behavioral signals ─────────────────────────────────────
+    if (behavioral) {
+        for (const factor of behavioral.factors) {
+            if (!ADVANCED_BEHAVIORAL_FACTORS.has(factor) || enableBehavioralAnalysis) {
+                add(factor);
+            }
+        }
     }
     // ── Cross-plugin signals (Pro/Enterprise) ────────────────────
     if (enableCrossPlugin && crossPlugin) {
@@ -88,7 +121,7 @@ export function computeBotScore(input) {
             add('rdap_suspect');
         }
     }
-    return { score: Math.min(100, raw), factors };
+    return { score: Math.max(0, Math.min(100, raw)), factors };
 }
 /**
  * Apply the rule chain to decide the final {@link BotDecision}.

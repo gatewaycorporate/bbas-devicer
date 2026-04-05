@@ -14,6 +14,7 @@ describe('analyzeUserAgent', () => {
     expect(r.isBot).toBe(true);
     expect(r.isHeadless).toBe(true);
     expect(r.isCrawler).toBe(false);
+    expect(r.claimsLegitBrowser).toBe(false);
     expect(r.botKind).toBe('headless');
   });
 
@@ -63,6 +64,7 @@ describe('analyzeUserAgent', () => {
     );
     expect(r.isBot).toBe(false);
     expect(r.isCrawler).toBe(true);
+    expect(r.claimsLegitBrowser).toBe(false);
     expect(r.botKind).toBe('crawler');
   });
 
@@ -83,8 +85,18 @@ describe('analyzeUserAgent', () => {
     expect(r.isBot).toBe(false);
     expect(r.isHeadless).toBe(false);
     expect(r.isCrawler).toBe(false);
-    expect(r.botKind).toBeUndefined();
+    expect(r.claimsLegitBrowser).toBe(true);
+    expect(r.botKind).toBe('browser');
     expect(r.uaString).toContain('Chrome/120');
+  });
+
+  it('returns unknown classification for an unrecognized UA', () => {
+    const r = analyzeUserAgent('CustomThing/1.0');
+    expect(r.isBot).toBe(false);
+    expect(r.isHeadless).toBe(false);
+    expect(r.isCrawler).toBe(false);
+    expect(r.claimsLegitBrowser).toBe(false);
+    expect(r.botKind).toBeUndefined();
   });
 
   // ── Missing UA ───────────────────────────────────────────────
@@ -92,6 +104,7 @@ describe('analyzeUserAgent', () => {
     const r = analyzeUserAgent(undefined);
     expect(r.isBot).toBe(false);
     expect(r.isHeadless).toBe(false);
+    expect(r.claimsLegitBrowser).toBe(false);
     expect(r.uaString).toBe('');
   });
 

@@ -23,6 +23,12 @@ export type {
   HeaderAnomalySignals,
   VelocitySignals,
   CrossPluginSignals,
+  MouseBehaviorMetrics,
+  KeyboardBehaviorMetrics,
+  ScrollBehaviorMetrics,
+  SessionTimingMetrics,
+  BehavioralMetrics,
+  BehavioralSignals,
   BbasEnrichment,
   BbasSnapshot,
   BbasStorage,
@@ -30,6 +36,7 @@ export type {
   BbasRule,
   BbasManagerOptions,
   BbasIdentifyContext,
+  BehavioralFingerprintPayload,
   IdentifyResult,
   EnrichedIdentifyResult,
 } from './types.js';
@@ -37,6 +44,7 @@ export type {
 // ── Analyzers ─────────────────────────────────────────────────
 export { analyzeUserAgent } from './libs/analyzers/ua.js';
 export { analyzeHeaders } from './libs/analyzers/headers.js';
+export { analyzeBehavior } from './libs/analyzers/behavioral.js';
 
 // ── Velocity ──────────────────────────────────────────────────
 export { computeVelocitySignals } from './libs/velocity.js';

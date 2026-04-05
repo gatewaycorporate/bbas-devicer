@@ -8,6 +8,7 @@ export { validateLicense, evictLicenseCache, POLAR_ORGANIZATION_ID, POLAR_BENEFI
 // ── Analyzers ─────────────────────────────────────────────────
 export { analyzeUserAgent } from './libs/analyzers/ua.js';
 export { analyzeHeaders } from './libs/analyzers/headers.js';
+export { analyzeBehavior } from './libs/analyzers/behavioral.js';
 // ── Velocity ──────────────────────────────────────────────────
 export { computeVelocitySignals } from './libs/velocity.js';
 // ── Scoring ───────────────────────────────────────────────────

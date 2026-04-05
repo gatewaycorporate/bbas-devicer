@@ -14,9 +14,16 @@ function makeEnrichment(overrides: Partial<BbasEnrichment> = {}): BbasEnrichment
     botScore: 0,
     botFactors: [],
     decision: 'allow',
-    uaClassification: { isBot: false, isHeadless: false, isCrawler: false, uaString: '' },
+    uaClassification: {
+      isBot: false,
+      isHeadless: false,
+      isCrawler: false,
+      claimsLegitBrowser: false,
+      uaString: '',
+    },
     headerAnomalies: { missingBrowserHeaders: false, suspiciousHeaderOrder: false, anomalyFactors: [] },
     velocitySignals: { requestCount: 0, windowMs: 60_000, requestsPerMinute: 0, exceedsThreshold: false },
+    behavioralSignals: { hasData: false, isRobotic: false, factors: [], humanScore: 50 },
     consistencyScore: 100,
     ...overrides,
   };
@@ -34,22 +41,24 @@ function makeSnapshot(botScore: number): BbasSnapshot {
 // ── computeBotScore ────────────────────────────────────────────
 
 describe('computeBotScore', () => {
-  it('returns score 0 and empty factors for clean request', () => {
+  it('treats a legitimate browser UA as a negative factor clamped to 0', () => {
     const { score, factors } = computeBotScore({
-      ua:      { isBot: false, isHeadless: false, isCrawler: false, uaString: 'Mozilla/5.0' },
+      ua:      { isBot: false, isHeadless: false, isCrawler: false, claimsLegitBrowser: true, uaString: 'Mozilla/5.0', botKind: 'browser' },
       headers: { missingBrowserHeaders: false, suspiciousHeaderOrder: false, anomalyFactors: [] },
       velocity: { requestCount: 5, windowMs: 60_000, requestsPerMinute: 5, exceedsThreshold: false },
+      enableBehavioralAnalysis: false,
       enableCrossPlugin: false,
     });
     expect(score).toBe(0);
-    expect(factors).toHaveLength(0);
+    expect(factors).toContain('legit_browser_ua');
   });
 
   it('adds 45 for headless_browser', () => {
     const { score, factors } = computeBotScore({
-      ua:      { isBot: true, isHeadless: true, isCrawler: false, uaString: 'HeadlessChrome', botKind: 'headless' },
+      ua:      { isBot: true, isHeadless: true, isCrawler: false, claimsLegitBrowser: false, uaString: 'HeadlessChrome', botKind: 'headless' },
       headers: { missingBrowserHeaders: false, suspiciousHeaderOrder: false, anomalyFactors: [] },
       velocity: { requestCount: 1, windowMs: 60_000, requestsPerMinute: 1, exceedsThreshold: false },
+      enableBehavioralAnalysis: false,
       enableCrossPlugin: false,
     });
     expect(score).toBeGreaterThanOrEqual(45);
@@ -58,55 +67,72 @@ describe('computeBotScore', () => {
 
   it('adds 40 for known_scraper_ua (non-headless bot)', () => {
     const { score, factors } = computeBotScore({
-      ua:      { isBot: true, isHeadless: false, isCrawler: false, uaString: 'python-requests/2.x', botKind: 'scraper' },
+      ua:      { isBot: true, isHeadless: false, isCrawler: false, claimsLegitBrowser: false, uaString: 'python-requests/2.x', botKind: 'scraper' },
       headers: { missingBrowserHeaders: false, suspiciousHeaderOrder: false, anomalyFactors: [] },
       velocity: { requestCount: 1, windowMs: 60_000, requestsPerMinute: 1, exceedsThreshold: false },
+      enableBehavioralAnalysis: false,
       enableCrossPlugin: false,
     });
     expect(score).toBeGreaterThanOrEqual(40);
     expect(factors).toContain('known_scraper_ua');
   });
 
-  it('adds 30 for missing_browser_headers', () => {
+  it('adds 10 for unknown_ua when no other UA classification applies', () => {
     const { score, factors } = computeBotScore({
-      ua:      { isBot: false, isHeadless: false, isCrawler: false, uaString: '' },
-      headers: { missingBrowserHeaders: true, suspiciousHeaderOrder: false, anomalyFactors: ['missing_accept'] },
+      ua:      { isBot: false, isHeadless: false, isCrawler: false, claimsLegitBrowser: false, uaString: 'CustomThing/1.0' },
+      headers: { missingBrowserHeaders: false, suspiciousHeaderOrder: false, anomalyFactors: [] },
       velocity: { requestCount: 1, windowMs: 60_000, requestsPerMinute: 1, exceedsThreshold: false },
+      enableBehavioralAnalysis: false,
       enableCrossPlugin: false,
     });
-    expect(score).toBeGreaterThanOrEqual(30);
+    expect(score).toBe(10);
+    expect(factors).toContain('unknown_ua');
+  });
+
+  it('adds 30 for missing_browser_headers', () => {
+    const { score, factors } = computeBotScore({
+      ua:      { isBot: false, isHeadless: false, isCrawler: false, claimsLegitBrowser: false, uaString: '' },
+      headers: { missingBrowserHeaders: true, suspiciousHeaderOrder: false, anomalyFactors: ['missing_accept'] },
+      velocity: { requestCount: 1, windowMs: 60_000, requestsPerMinute: 1, exceedsThreshold: false },
+      enableBehavioralAnalysis: false,
+      enableCrossPlugin: false,
+    });
+    expect(score).toBeGreaterThanOrEqual(40);
     expect(factors).toContain('missing_browser_headers');
   });
 
   it('adds 25 for velocity_exceeded', () => {
     const { score, factors } = computeBotScore({
-      ua:      { isBot: false, isHeadless: false, isCrawler: false, uaString: 'Mozilla/5.0' },
+      ua:      { isBot: false, isHeadless: false, isCrawler: false, claimsLegitBrowser: true, uaString: 'Mozilla/5.0', botKind: 'browser' },
       headers: { missingBrowserHeaders: false, suspiciousHeaderOrder: false, anomalyFactors: [] },
       velocity: { requestCount: 200, windowMs: 60_000, requestsPerMinute: 200, exceedsThreshold: true },
+      enableBehavioralAnalysis: false,
       enableCrossPlugin: false,
     });
-    expect(score).toBeGreaterThanOrEqual(25);
+    expect(score).toBe(15);
     expect(factors).toContain('velocity_exceeded');
   });
 
   it('adds 40 for tor_exit_node when cross-plugin enabled', () => {
     const { score, factors } = computeBotScore({
-      ua:      { isBot: false, isHeadless: false, isCrawler: false, uaString: 'Mozilla/5.0' },
+      ua:      { isBot: false, isHeadless: false, isCrawler: false, claimsLegitBrowser: true, uaString: 'Mozilla/5.0', botKind: 'browser' },
       headers: { missingBrowserHeaders: false, suspiciousHeaderOrder: false, anomalyFactors: [] },
       velocity: { requestCount: 0, windowMs: 60_000, requestsPerMinute: 0, exceedsThreshold: false },
       crossPlugin: { isTor: true },
+      enableBehavioralAnalysis: false,
       enableCrossPlugin: true,
     });
     expect(factors).toContain('tor_exit_node');
-    expect(score).toBeGreaterThanOrEqual(40);
+    expect(score).toBe(30);
   });
 
   it('does not add cross-plugin factors when enableCrossPlugin is false', () => {
     const { factors } = computeBotScore({
-      ua:      { isBot: false, isHeadless: false, isCrawler: false, uaString: '' },
+      ua:      { isBot: false, isHeadless: false, isCrawler: false, claimsLegitBrowser: false, uaString: '' },
       headers: { missingBrowserHeaders: false, suspiciousHeaderOrder: false, anomalyFactors: [] },
       velocity: { requestCount: 0, windowMs: 60_000, requestsPerMinute: 0, exceedsThreshold: false },
       crossPlugin: { isTor: true, isVpn: true },
+      enableBehavioralAnalysis: false,
       enableCrossPlugin: false,
     });
     expect(factors).not.toContain('tor_exit_node');
@@ -115,10 +141,11 @@ describe('computeBotScore', () => {
 
   it('caps score at 100', () => {
     const { score } = computeBotScore({
-      ua:      { isBot: true, isHeadless: true, isCrawler: false, uaString: 'HeadlessChrome', botKind: 'headless' },
+      ua:      { isBot: true, isHeadless: true, isCrawler: false, claimsLegitBrowser: false, uaString: 'HeadlessChrome', botKind: 'headless' },
       headers: { missingBrowserHeaders: true, suspiciousHeaderOrder: true, anomalyFactors: [] },
       velocity: { requestCount: 999, windowMs: 60_000, requestsPerMinute: 999, exceedsThreshold: true },
       crossPlugin: { isTor: true, isVpn: true, isHosting: true, isAiAgent: true, peerTaintScore: 90 },
+      enableBehavioralAnalysis: true,
       enableCrossPlugin: true,
     });
     expect(score).toBe(100);
@@ -126,13 +153,60 @@ describe('computeBotScore', () => {
 
   it('flags known_crawler (5 pts) for Googlebot without making isBot true', () => {
     const { score, factors } = computeBotScore({
-      ua:      { isBot: false, isHeadless: false, isCrawler: true, uaString: 'Googlebot', botKind: 'crawler' },
+      ua:      { isBot: false, isHeadless: false, isCrawler: true, claimsLegitBrowser: false, uaString: 'Googlebot', botKind: 'crawler' },
       headers: { missingBrowserHeaders: false, suspiciousHeaderOrder: false, anomalyFactors: [] },
       velocity: { requestCount: 0, windowMs: 60_000, requestsPerMinute: 0, exceedsThreshold: false },
+      enableBehavioralAnalysis: false,
       enableCrossPlugin: false,
     });
     expect(factors).toContain('known_crawler');
     expect(score).toBe(5);
+  });
+
+  it('adds free behavioral session factors even when advanced analysis is disabled', () => {
+    const { score, factors } = computeBotScore({
+      ua:      { isBot: false, isHeadless: false, isCrawler: false, claimsLegitBrowser: true, uaString: 'Mozilla/5.0', botKind: 'browser' },
+      headers: { missingBrowserHeaders: false, suspiciousHeaderOrder: false, anomalyFactors: [] },
+      velocity: { requestCount: 0, windowMs: 60_000, requestsPerMinute: 0, exceedsThreshold: false },
+      behavioral: { hasData: true, isRobotic: false, humanScore: 25, factors: ['no_prior_interaction', 'impossibly_fast_session'] },
+      enableBehavioralAnalysis: false,
+      enableCrossPlugin: false,
+    });
+    expect(factors).toContain('no_prior_interaction');
+    expect(factors).toContain('impossibly_fast_session');
+    expect(score).toBe(15);
+  });
+
+  it('ignores advanced behavioral factors when advanced analysis is disabled', () => {
+    const { factors } = computeBotScore({
+      ua:      { isBot: false, isHeadless: false, isCrawler: false, claimsLegitBrowser: false, uaString: '' },
+      headers: { missingBrowserHeaders: false, suspiciousHeaderOrder: false, anomalyFactors: [] },
+      velocity: { requestCount: 0, windowMs: 60_000, requestsPerMinute: 0, exceedsThreshold: false },
+      behavioral: { hasData: true, isRobotic: true, humanScore: 10, factors: ['robotic_mouse_pattern', 'instant_typing'] },
+      enableBehavioralAnalysis: false,
+      enableCrossPlugin: false,
+    });
+    expect(factors).not.toContain('robotic_mouse_pattern');
+    expect(factors).not.toContain('instant_typing');
+  });
+
+  it('adds advanced behavioral penalties and bonuses when enabled', () => {
+    const { score, factors } = computeBotScore({
+      ua:      { isBot: false, isHeadless: false, isCrawler: false, claimsLegitBrowser: true, uaString: 'Mozilla/5.0', botKind: 'browser' },
+      headers: { missingBrowserHeaders: false, suspiciousHeaderOrder: false, anomalyFactors: [] },
+      velocity: { requestCount: 0, windowMs: 60_000, requestsPerMinute: 0, exceedsThreshold: false },
+      behavioral: {
+        hasData: true,
+        isRobotic: false,
+        humanScore: 60,
+        factors: ['robotic_mouse_pattern', 'natural_typing'],
+      },
+      enableBehavioralAnalysis: true,
+      enableCrossPlugin: false,
+    });
+    expect(factors).toContain('robotic_mouse_pattern');
+    expect(factors).toContain('natural_typing');
+    expect(score).toBe(10);
   });
 });
 
@@ -167,7 +241,7 @@ describe('applyRules', () => {
     // Score would normally trigger a block via defaults
     const e = makeEnrichment({
       botScore: 90,
-      uaClassification: { isBot: true, isHeadless: true, isCrawler: false, uaString: 'HeadlessChrome', botKind: 'headless' },
+      uaClassification: { isBot: true, isHeadless: true, isCrawler: false, claimsLegitBrowser: false, uaString: 'HeadlessChrome', botKind: 'headless' },
     });
     const decision = applyRules(e, [customRule, ...DEFAULT_RULES], 50, 75);
     expect(decision).toBe('allow');
@@ -185,7 +259,7 @@ describe('applyRules', () => {
   it('headless_block rule fires for headless browser', () => {
     const e = makeEnrichment({
       botScore: 45,
-      uaClassification: { isBot: true, isHeadless: true, isCrawler: false, uaString: 'HeadlessChrome', botKind: 'headless' },
+      uaClassification: { isBot: true, isHeadless: true, isCrawler: false, claimsLegitBrowser: false, uaString: 'HeadlessChrome', botKind: 'headless' },
     });
     const decision = applyRules(e, DEFAULT_RULES, 50, 75);
     expect(decision).toBe('block');
