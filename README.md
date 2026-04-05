@@ -1,7 +1,7 @@
 # bbas-devicer
 
 **Bot Blocking & Anti-Scrape Middleware** for the FP-Devicer Intelligence Suite.  
-Developed by [Gateway Corporate Solutions](https://gatewaycorporate.io).
+Developed by [Gateway Corporate Solutions](https://gatewaycorporate.org).
 
 ---
 
@@ -24,8 +24,22 @@ Developed by [Gateway Corporate Solutions](https://gatewaycorporate.io).
 
 ## Installation
 
+Install `bbas-devicer` as a standalone package:
+
 ```bash
 npm install bbas-devicer
+```
+
+Install `bbas-devicer` with FP-Devicer:
+
+```bash
+npm install devicer.js bbas-devicer
+```
+
+Install the full Devicer Intelligence Suite meta-package:
+
+```bash
+npm install @gatewaycorporate/devicer-intel
 ```
 
 Optional peer dependencies (install the ones matching your storage choice):
@@ -166,11 +180,11 @@ const bbasManager = new BbasManager({
 ```
 identify(payload, context)
    │
-   ├─ 'ip'   post-processor  (ip-devicer)
-   │      └─> enrichmentInfo.details.ip.isTor / isVpn / riskScore / …
-   │
-   ├─ 'tls'  post-processor  (tls-devicer)
-   │      └─> enrichmentInfo.details.tls.consistencyScore / factors
+  ├─ network bundle reference
+  │  ├─ 'ip'   post-processor  (ip-devicer)
+  │  │      └─> enrichmentInfo.details.ip.isTor / isVpn / riskScore / …
+  │  └─ 'tls'  post-processor  (tls-devicer)
+  │         └─> enrichmentInfo.details.tls.consistencyScore / factors
    │
    ├─ 'peer' post-processor  (peer-devicer)
    │      └─> enrichmentInfo.details.peer.taintScore
